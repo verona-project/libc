@@ -69,3 +69,30 @@ package is compiled together:
 ```sh
 verona build libc ./dist
 ```
+
+## Dependencies and development
+
+The package version is declared in `verona.build`. libc depends on Verona Base;
+place its source checkout beside this repository as `base/`, providing
+`../base/src` to the build. Consumers also need Base on their module search path.
+
+This repository is pinned at `projects/libc` in
+[Verona](https://github.com/verona-project/verona). Compiler ABI checks and the
+project-tool and formatter integration suites run from the main repository:
+
+```sh
+make test-compiler
+make build
+sbcl --script projects/project/tests/run-integration.lisp
+make test-formatter
+```
+
+Use Verona's pinned Nix development environment for these checks. Public clones
+use HTTPS. To push libc changes over SSH:
+
+```sh
+git remote set-url --push origin git@github.com:verona-project/libc.git
+```
+
+Commit and push changes here before updating Verona's submodule reference.
+Released under the Unlicense; see `LICENSE`.
