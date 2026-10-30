@@ -4,6 +4,7 @@
 ;; owns an API, such as libc.network or libc.descriptor, in client code.
 (import libc.types)
 (import libc.constants)
+(import libc.errno)
 (import libc.memory)
 (import libc.string)
 (import libc.stdio)

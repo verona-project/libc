@@ -22,11 +22,26 @@ These are target definitions, not a portable replacement for every C header.
 
 The declarations are divided by C API category. `src/libc.vrn` is the build
 aggregator; clients import the category they use. The modules are
-`libc.types`, `libc.constants`, `libc.memory`, `libc.string`, `libc.stdio`,
+`libc.types`, `libc.constants`, `libc.errno`, `libc.memory`, `libc.string`, `libc.stdio`,
 `libc.descriptor`, `libc.filesystem`, `libc.process`, `libc.time`,
 `libc.math`, `libc.network`, and `libc.pthread`. The library deliberately
 contains only C ABI declarations; applications own their convenience
 functions while the Verona surface is still evolving.
+
+`libc.errno:errno-pointer` returns borrowed storage for the calling thread's
+`errno`: Darwin uses `__error`, Linux uses `__errno_location`. Do not free the
+pointer or share it between threads. Read the value immediately after a failed
+C call; successful calls need not clear it. Error values such as `EINTR` and
+`ECHILD` are exported by `libc.constants`.
+
+`libc.filesystem:mkstemp` requires a writable NUL-terminated template ending in
+`XXXXXX`. It replaces those characters with a unique name and returns an open
+file descriptor; the caller closes it and removes the file with `unlink` when
+finished. `libc.stdio:ferror` reads a stream's error indicator (distinct from
+end-of-file). `libc.process:waitpid` takes a PID, an out-pointer to a C integer
+status, and options (including `WNOHANG`); it returns the selected child PID,
+zero for a pending nonblocking wait, or -1 on error. Its status is the raw POSIX
+wait status, not a process exit code.
 
 Some declarations are intentionally low-level placeholders: variadic functions
 and APIs that require C-layout storage still need additional ABI support before
@@ -39,12 +54,13 @@ their exact callback signatures and C-layout argument storage. Use
 
 | Area | Functions |
 | --- | --- |
+| Error state | `errno-pointer` (in `libc.errno`) |
 | Memory | `malloc`, `calloc`, `realloc`, `free`, `memcpy`, `memmove`, `memset`, `memcmp` |
 | Strings | `strlen`, `strcmp`, `strncmp`, `strcpy`, `strncpy`, `strchr`, `strstr`, `strerror` |
-| Standard I/O | `fopen`, `fclose`, `fread`, `fwrite`, `fgets`, `fputs`, `getchar`, `putchar`, `puts`, `perror` |
+| Standard I/O | `fopen`, `fclose`, `ferror`, `fread`, `fwrite`, `fgets`, `fputs`, `getchar`, `putchar`, `puts`, `perror` |
 | File descriptors | `open`, `close`, `read`, `write`, `lseek`, `pipe`, `dup`, `dup2` |
-| Files/directories | `stat`, `mkdir`, `unlink`, `rename`, `opendir`, `readdir`, `closedir` |
-| Process/environment | `getenv`, `setenv`, `unsetenv`, `getpid`, `fork`, `execv`, `execve`, `execvp`, `wait`, `exit` |
+| Files/directories | `stat`, `mkdir`, `mkstemp`, `unlink`, `rename`, `opendir`, `readdir`, `closedir` |
+| Process/environment | `getenv`, `setenv`, `unsetenv`, `getpid`, `fork`, `execv`, `execve`, `execvp`, `wait`, `waitpid`, `exit` |
 | Time | `time`, `clock-gettime`, `sleep`, `nanosleep` |
 | Conversion/math | `abs`, `strtol`, `strtoul`, `qsort`, `bsearch`, `sin`, `cos`, `sqrt` |
 | Networking | `socket`, `htons`, `inet-addr`, `setsockopt`, `bind`, `listen`, `accept`, `connect`, `send`, `recv`, `getaddrinfo`, `freeaddrinfo` |
