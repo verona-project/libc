@@ -3,9 +3,8 @@
 
 ;; Access the calling thread's errno storage. The pointer is borrowed; never free
 ;; it or share it between threads. Read errno only after a failed C operation.
-#+darwin
-(base:external-function errno-pointer "__error" () (pointer types:c-int))
-#+linux
-(base:external-function errno-pointer "__errno_location" () (pointer types:c-int))
+#+darwin (base:external-function errno-pointer "__error" () (pointer types:c-int))
+
+#+linux (base:external-function errno-pointer "__errno_location" () (pointer types:c-int))
 
 (export errno-pointer)
