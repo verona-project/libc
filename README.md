@@ -110,5 +110,5 @@ use HTTPS. To push libc changes over SSH:
 git remote set-url --push origin git@github.com:verona-project/libc.git
 ```
 
-Commit and push changes here before updating Verona's submodule reference.
+Commit changes here before updating Verona's submodule reference.
 Released under the Unlicense; see `LICENSE`.
