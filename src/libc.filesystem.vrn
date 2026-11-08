@@ -20,4 +20,10 @@
 
 (base:external-function closedir "closedir" ((pointer types:directory-stream)) types:c-int)
 
-(export stat mkdir mkstemp unlink rename opendir readdir closedir)
+;; Process-local directory change keeps generated paths independent of name length.
+(base:external-function chdir "chdir" ((pointer u8)) i32)
+
+;; CREAT has a fixed C ABI, including on Darwin ARM64.
+(base:external-function creat "creat" ((pointer u8) types:mode-t) i32)
+
+(export stat mkdir mkstemp unlink rename opendir readdir closedir chdir creat)
