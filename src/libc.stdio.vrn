@@ -4,6 +4,10 @@
 ;; Buffered stdio streams and character I/O.
 (base:external-function fopen "fopen" (types:c-string types:c-string) (pointer types:file-stream))
 
+(base:external-function tmpfile "tmpfile" () (pointer types:file-stream))
+
+(base:external-function fileno "fileno" ((pointer types:file-stream)) types:file-descriptor)
+
 (base:external-function ferror "ferror" ((pointer types:file-stream)) types:c-int)
 
 (base:external-function fclose "fclose" ((pointer types:file-stream)) types:c-int)
@@ -36,4 +40,4 @@
 
 (base:external-function perror "perror" (types:c-string) void)
 
-(export fopen ferror fclose fread fwrite fgets fputs getchar putchar puts perror)
+(export fopen tmpfile fileno ferror fclose fread fwrite fgets fputs getchar putchar puts perror)

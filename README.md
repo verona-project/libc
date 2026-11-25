@@ -57,7 +57,7 @@ their exact callback signatures and C-layout argument storage. Use
 | Error state | `errno-pointer` (in `libc.errno`) |
 | Memory | `malloc`, `calloc`, `realloc`, `free`, `memcpy`, `memmove`, `memset`, `memcmp` |
 | Strings | `strlen`, `strcmp`, `strncmp`, `strcpy`, `strncpy`, `strchr`, `strstr`, `strerror` |
-| Standard I/O | `fopen`, `fclose`, `ferror`, `fread`, `fwrite`, `fgets`, `fputs`, `getchar`, `putchar`, `puts`, `perror` |
+| Standard I/O | `fopen`, `tmpfile`, `fileno`, `fclose`, `ferror`, `fread`, `fwrite`, `fgets`, `fputs`, `getchar`, `putchar`, `puts`, `perror` |
 | File descriptors | `open`, `close`, `read`, `write`, `lseek`, `pipe`, `dup`, `dup2` |
 | Files/directories | `stat`, `mkdir`, `mkstemp`, `unlink`, `rename`, `opendir`, `readdir`, `closedir` |
 | Process/environment | `getenv`, `setenv`, `unsetenv`, `getpid`, `fork`, `execv`, `execve`, `execvp`, `wait`, `waitpid`, `exit` |
