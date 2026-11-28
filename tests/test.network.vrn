@@ -1,0 +1,145 @@
+(import base)
+(import testing)
+(import libc.constants :as constants)
+(import libc.descriptor :as fd)
+(import libc.network :as net)
+(import libc.types :as types)
+(import test.support :as support)
+
+(testing:test ipv6-conversion
+  (let
+    ((address types:ipv6-address (types:ipv6-address (array-of 0 0 0 0)))
+     (bytes (array u8 8) (array-of 0 0 0 0 0 0 0 0))
+     (raw (pointer void) (cast (pointer void) (& address))))
+    (testing:checks
+      (testing:assert-equal (net:inet-pton constants:AF-INET6 "::1" raw) 1)
+      (support:assert-string (net:inet-ntop constants:AF-INET6 raw (& (index bytes 0)) 8) "::1")
+      (testing:assert-equal (net:inet-pton constants:AF-INET6 "invalid" raw) 0))))
+
+(testing:test numeric-address-lookup
+  (let ((head (pointer types:address-info) nil))
+    (match (net:getaddrinfo "127.0.0.1" "80" nil (& head))
+      (0
+        (match (support:present (cast (pointer void) head))
+          (false (testing:fail))
+          (true
+            (let
+              ((address (pointer types:socket-address) (field (deref head) address))
+               (result
+                 testing:result
+                 (testing:checks
+                   (testing:assert-equal (field (deref head) family) constants:AF-INET)
+                   (testing:assert-equal (field (deref head) address-length) 16)
+                   (match (support:present (cast (pointer void) address))
+                     (false (testing:fail))
+                     (true (testing:assert-equal (field (deref address) family) 2))))))
+              (do (net:freeaddrinfo head) result)))))
+      (_ (testing:fail)))))
+
+(base:function exchange ((sender types:file-descriptor) (receiver types:file-descriptor))
+  testing:result
+  (let ((value u8 0))
+    (match (net:send sender (cast (pointer void) "A") 1 0)
+      (1
+        (let ((watch types:poll-descriptor (types:poll-descriptor receiver 1 0)))
+          (match (fd:poll (& watch) 1 1000)
+            (1
+              (testing:checks
+                (testing:assert-equal (net:recv receiver (cast (pointer void) (& value)) 1 0) 1)
+                (testing:assert-equal value 65)))
+            (_ (testing:fail)))))
+      (_ (testing:fail)))))
+
+(testing:test unix-socket-pair
+  (let ((sockets (array types:file-descriptor 2) (array-of -1 -1)))
+    (match (net:socketpair constants:AF-UNIX constants:SOCK-STREAM 0 (& (index sockets 0)))
+      (0
+        (let
+          ((sender types:file-descriptor (index sockets 0))
+           (receiver types:file-descriptor (index sockets 1))
+           (enabled types:c-int 1)
+           (option types:c-int 0)
+           (length types:socket-length-t 4))
+          (testing:checks
+            (testing:assert-equal
+              (net:setsockopt
+                sender
+                constants:SOL-SOCKET
+                constants:SO-REUSEADDR
+                (cast (pointer void) (& enabled))
+                4)
+              0)
+            (testing:assert-equal
+              (net:getsockopt
+                sender
+                constants:SOL-SOCKET
+                constants:SO-REUSEADDR
+                (cast (pointer void) (& option))
+                (& length))
+              0)
+            (testing:assert-not-equal option 0)
+            (exchange sender receiver)
+            (testing:assert-equal (fd:close sender) 0)
+            (testing:assert-equal (fd:close receiver) 0))))
+      (_ (testing:fail)))))
+
+(base:function accept-once ((listener types:file-descriptor)) types:file-descriptor
+  #+darwin (net:accept listener nil nil)
+  #+linux (net:accept4 listener nil nil 0))
+
+(base:function connect-client
+  ((listener types:file-descriptor)
+   (address (pointer types:socket-address))
+   (length types:socket-length-t)) testing:result
+  (let ((client types:file-descriptor (net:socket constants:AF-INET constants:SOCK-STREAM 0)))
+    (match (< client 0)
+      (true (testing:fail))
+      (false
+        (testing:checks
+          (match (net:connect client address length)
+            (0
+              (let ((peer types:file-descriptor (accept-once listener)))
+                (match (< peer 0)
+                  (true (testing:fail))
+                  (false
+                    (testing:checks (exchange client peer) (testing:assert-equal (fd:close peer) 0))))))
+            (_ (testing:fail)))
+          (testing:assert-equal (fd:close client) 0))))))
+
+(base:function listen-on-loopback ((listener types:file-descriptor)) testing:result
+  (let
+    ((address
+       types:ipv4-socket-address
+       (types:ipv4-socket-address
+         #+darwin 16
+         2
+         0
+         (net:inet-addr "127.0.0.1")
+         (array-of 0 0 0 0 0 0 0 0)))
+     (storage (array u64 16) (array-of 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0))
+     (bound
+       (pointer types:socket-address)
+       (cast (pointer types:socket-address) (cast (pointer void) (& (index storage 0)))))
+     (length types:socket-length-t 128))
+    (base:cond
+      ((base:not
+         (==
+           (net:bind
+             listener
+             (cast (pointer types:socket-address) (cast (pointer void) (& address)))
+             16)
+           0))
+       (testing:fail))
+      ((base:not (== (net:listen listener 1) 0)) (testing:fail))
+      ((base:not (== (net:getsockname listener bound (& length)) 0)) (testing:fail))
+      (true
+        (testing:checks (testing:assert-equal length 16) (connect-client listener bound length))))))
+
+(testing:test loopback-connection
+  (let ((listener types:file-descriptor (net:socket constants:AF-INET constants:SOCK-STREAM 0)))
+    (match (< listener 0)
+      (true (testing:fail))
+      (false
+        (testing:checks (listen-on-loopback listener) (testing:assert-equal (fd:close listener) 0))))))
+
+(export ipv6-conversion numeric-address-lookup unix-socket-pair loopback-connection)

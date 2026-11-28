@@ -1,0 +1,14 @@
+(import base)
+(import testing)
+(import libc.string :as string)
+(import libc.types :as types)
+
+(base:function present ((value (pointer void))) bool
+  (base:not (base:is-null value)))
+
+(base:function assert-string ((actual types:c-string) (expected types:c-string)) testing:result
+  (match (present (cast (pointer void) actual))
+    (true (testing:assert-equal (string:strcmp actual expected) 0))
+    (false (testing:fail))))
+
+(export present assert-string)

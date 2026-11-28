@@ -1,0 +1,12 @@
+(import base)
+(import libc.types :as types)
+
+(base:external-function dlopen "dlopen" (types:c-string types:c-int) (pointer void))
+
+(base:external-function dlsym "dlsym" ((pointer void) types:c-string) (pointer void))
+
+(base:external-function dlerror "dlerror" () types:c-string)
+
+(base:external-function dlclose "dlclose" ((pointer void)) types:c-int)
+
+(export dlopen dlsym dlerror dlclose)

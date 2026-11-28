@@ -6,3 +6,14 @@
   (module-path "../base/src")
   (target native)
   (optimize 0))
+
+(executable
+  libc-tests
+  (root libc-tests)
+  (module-path "src")
+  (module-path "tests")
+  (module-path "../base/src")
+  (module-path "../testing/src")
+  (native-library "m" (link dynamic))
+  (target native)
+  (optimize 0))

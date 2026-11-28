@@ -1,8 +1,7 @@
 (import base)
 (import libc.types :as types)
 
-;; Small numeric and conversion utilities. qsort and bsearch remain
-;; declarations until this binding models their exact C callback signatures.
+;; Numeric conversion, math, and array algorithms.
 (base:external-function abs "abs" (types:c-int) types:c-int)
 
 (base:external-function
@@ -20,13 +19,13 @@
 (base:external-function
   qsort
   "qsort"
-  ((pointer void) types:size-t types:size-t (pointer void))
+  ((pointer void) types:size-t types:size-t types:comparison-function)
   void)
 
 (base:external-function
   bsearch
   "bsearch"
-  ((pointer void) (pointer void) types:size-t types:size-t (pointer void))
+  ((pointer void) (pointer void) types:size-t types:size-t types:comparison-function)
   (pointer void))
 
 (base:external-function sin "sin" (f64) f64)
@@ -35,4 +34,39 @@
 
 (base:external-function sqrt "sqrt" (f64) f64)
 
-(export abs strtol strtoul qsort bsearch sin cos sqrt)
+(base:external-function strtof "strtof" (types:c-string (pointer types:c-string)) f32)
+
+(base:external-function strtod "strtod" (types:c-string (pointer types:c-string)) f64)
+
+(base:external-function gcvt "gcvt" (f64 types:c-int types:c-string) types:c-string)
+
+(base:external-function pow "pow" (f64 f64) f64)
+
+(base:external-function exp "exp" (f64) f64)
+
+(base:external-function log "log" (f64) f64)
+
+(base:external-function floor "floor" (f64) f64)
+
+(base:external-function ceil "ceil" (f64) f64)
+
+(base:external-function fabs "fabs" (f64) f64)
+
+(export
+  abs
+  strtol
+  strtoul
+  qsort
+  bsearch
+  sin
+  cos
+  sqrt
+  strtof
+  strtod
+  gcvt
+  pow
+  exp
+  log
+  floor
+  ceil
+  fabs)

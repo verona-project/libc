@@ -1,9 +1,61 @@
 (import base)
 (import libc.types :as types)
 
-;; Filesystem metadata and directory operations.  Structure types remain opaque
-;; until their ABI layouts are modelled explicitly.
-(base:external-function stat "stat" (types:c-string (pointer types:file-status)) types:c-int)
+;; Filesystem metadata and directory operations.
+;; Use the SDK-selected 64-bit inode ABI on Intel Darwin.
+#+darwin #+x86_64 (base:external-function
+                    stat
+                    "stat$INODE64"
+                    (types:c-string (pointer types:file-status))
+                    types:c-int)
+
+#+darwin #-x86_64 (base:external-function
+                    stat
+                    "stat"
+                    (types:c-string (pointer types:file-status))
+                    types:c-int)
+
+#-darwin (base:external-function
+           stat
+           "stat"
+           (types:c-string (pointer types:file-status))
+           types:c-int)
+
+#+darwin #+x86_64 (base:external-function
+                    fstat
+                    "fstat$INODE64"
+                    (types:file-descriptor (pointer types:file-status))
+                    types:c-int)
+
+#+darwin #-x86_64 (base:external-function
+                    fstat
+                    "fstat"
+                    (types:file-descriptor (pointer types:file-status))
+                    types:c-int)
+
+#-darwin (base:external-function
+           fstat
+           "fstat"
+           (types:file-descriptor (pointer types:file-status))
+           types:c-int)
+
+#+darwin #+x86_64 (base:external-function
+                    lstat
+                    "lstat$INODE64"
+                    (types:c-string (pointer types:file-status))
+                    types:c-int)
+
+#+darwin #-x86_64 (base:external-function
+                    lstat
+                    "lstat"
+                    (types:c-string (pointer types:file-status))
+                    types:c-int)
+
+#-darwin (base:external-function
+           lstat
+           "lstat"
+           (types:c-string (pointer types:file-status))
+           types:c-int)
 
 (base:external-function mkdir "mkdir" (types:c-string types:mode-t) types:c-int)
 
@@ -14,16 +66,82 @@
 
 (base:external-function rename "rename" (types:c-string types:c-string) types:c-int)
 
-(base:external-function opendir "opendir" (types:c-string) (pointer types:directory-stream))
+#+darwin #+x86_64 (base:external-function
+                    opendir
+                    "opendir$INODE64"
+                    (types:c-string)
+                    (pointer types:directory-stream))
 
-(base:external-function readdir "readdir" ((pointer types:directory-stream)) (pointer void))
+#+darwin #-x86_64 (base:external-function
+                    opendir
+                    "opendir"
+                    (types:c-string)
+                    (pointer types:directory-stream))
+
+#+linux (base:external-function opendir "opendir" (types:c-string) (pointer types:directory-stream))
+
+;; The entry is borrowed from the directory stream. Read its fields in place.
+#+darwin #+x86_64 (base:external-function
+                    readdir
+                    "readdir$INODE64"
+                    ((pointer types:directory-stream))
+                    (pointer types:directory-entry))
+
+#+darwin #-x86_64 (base:external-function
+                    readdir
+                    "readdir"
+                    ((pointer types:directory-stream))
+                    (pointer types:directory-entry))
+
+#+linux (base:external-function
+          readdir
+          "readdir"
+          ((pointer types:directory-stream))
+          (pointer types:directory-entry))
 
 (base:external-function closedir "closedir" ((pointer types:directory-stream)) types:c-int)
 
 ;; Process-local directory change keeps generated paths independent of name length.
-(base:external-function chdir "chdir" ((pointer u8)) i32)
+(base:external-function chdir "chdir" (types:c-string) types:c-int)
 
 ;; CREAT has a fixed C ABI, including on Darwin ARM64.
-(base:external-function creat "creat" ((pointer u8) types:mode-t) i32)
+(base:external-function creat "creat" (types:c-string types:mode-t) types:file-descriptor)
 
-(export stat mkdir mkstemp unlink rename opendir readdir closedir chdir creat)
+(base:external-function access "access" (types:c-string types:c-int) types:c-int)
+
+(base:external-function getcwd "getcwd" (types:c-string types:size-t) types:c-string)
+
+(base:external-function realpath "realpath" (types:c-string types:c-string) types:c-string)
+
+(base:external-function chmod "chmod" (types:c-string types:mode-t) types:c-int)
+
+(base:external-function rmdir "rmdir" (types:c-string) types:c-int)
+
+(base:external-function
+  readlink
+  "readlink"
+  (types:c-string types:c-string types:size-t)
+  types:ssize-t)
+
+(base:external-function symlink "symlink" (types:c-string types:c-string) types:c-int)
+
+(export
+  stat
+  fstat
+  lstat
+  mkdir
+  mkstemp
+  unlink
+  rename
+  opendir
+  readdir
+  closedir
+  chdir
+  creat
+  access
+  getcwd
+  realpath
+  chmod
+  rmdir
+  readlink
+  symlink)

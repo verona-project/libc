@@ -57,6 +57,89 @@
 
 (base:external-function freeaddrinfo "freeaddrinfo" ((pointer types:address-info)) void)
 
+(base:external-function
+  inet-pton
+  "inet_pton"
+  (types:c-int types:c-string (pointer void))
+  types:c-int)
+
+(base:external-function
+  inet-ntop
+  "inet_ntop"
+  (types:c-int (pointer void) types:c-string types:socket-length-t)
+  types:c-string)
+
+(base:external-function shutdown "shutdown" (types:file-descriptor types:c-int) types:c-int)
+
+(base:external-function
+  getsockopt
+  "getsockopt"
+  (types:file-descriptor types:c-int types:c-int (pointer void) (pointer types:socket-length-t))
+  types:c-int)
+
+(base:external-function
+  getsockname
+  "getsockname"
+  (types:file-descriptor (pointer types:socket-address) (pointer types:socket-length-t))
+  types:c-int)
+
+(base:external-function
+  getpeername
+  "getpeername"
+  (types:file-descriptor (pointer types:socket-address) (pointer types:socket-length-t))
+  types:c-int)
+
+(base:external-function
+  socketpair
+  "socketpair"
+  (types:c-int types:c-int types:c-int (pointer types:file-descriptor))
+  types:c-int)
+
+(base:external-function
+  sendto
+  "sendto"
+  (types:file-descriptor
+    (pointer void)
+    types:size-t
+    types:c-int
+    (pointer types:socket-address)
+    types:socket-length-t)
+  types:ssize-t)
+
+(base:external-function
+  recvfrom
+  "recvfrom"
+  (types:file-descriptor
+    (pointer void)
+    types:size-t
+    types:c-int
+    (pointer types:socket-address)
+    (pointer types:socket-length-t))
+  types:ssize-t)
+
+(base:external-function
+  getnameinfo
+  "getnameinfo"
+  ((pointer types:socket-address)
+   types:socket-length-t
+   types:c-string
+   types:socket-length-t
+   types:c-string
+   types:socket-length-t
+   types:c-int)
+  types:c-int)
+
+(base:external-function gai-strerror "gai_strerror" (types:c-int) types:c-string)
+
+#+linux (base:external-function
+          accept4
+          "accept4"
+          (types:file-descriptor
+            (pointer types:socket-address)
+            (pointer types:socket-length-t)
+            types:c-int)
+          types:file-descriptor)
+
 (export
   socket
   htons
@@ -69,4 +152,17 @@
   send
   recv
   getaddrinfo
-  freeaddrinfo)
+  freeaddrinfo
+  inet-pton
+  inet-ntop
+  shutdown
+  getsockopt
+  getsockname
+  getpeername
+  socketpair
+  sendto
+  recvfrom
+  getnameinfo
+  gai-strerror)
+
+#+linux (export accept4)

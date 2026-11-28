@@ -1,0 +1,67 @@
+(import base)
+(import testing)
+(import libc.constants :as constants)
+(import libc.memory :as memory)
+(import libc.types :as types)
+(import test.support :as support)
+
+;; Use a stride on real storage to ask Verona for the ABI size of a type.
+(base:macro stride (type storage)
+  (list
+    '%pointer-difference-primitive-pointer
+    (list 'cast '(pointer void) (list 'pointer-offset (list 'cast (list 'pointer type) storage) 1))
+    storage))
+
+#+darwin (base:constant stat-size u64 144)
+
+#+linux #+x86_64 (base:constant stat-size u64 144)
+
+#+linux #+aarch64 (base:constant stat-size u64 128)
+
+#+darwin (base:constant directory-entry-size u64 1048)
+
+#+linux (base:constant directory-entry-size u64 280)
+
+#+darwin (base:constant unix-address-size u64 106)
+
+#+linux (base:constant unix-address-size u64 110)
+
+#+darwin (base:constant mutex-size u64 64)
+
+#+linux #+x86_64 (base:constant mutex-size u64 40)
+
+#+linux #+aarch64 (base:constant mutex-size u64 48)
+
+(testing:test abi-strides
+  (testing:with-fixture (storage (pointer void) (memory:malloc 2048) memory:free)
+    (match (support:present storage)
+      (false (testing:fail))
+      (true
+        (testing:checks
+          (testing:assert-equal (stride types:file-status storage) stat-size)
+          (testing:assert-equal (stride types:directory-entry storage) directory-entry-size)
+          (testing:assert-equal (stride types:time-specification storage) 16)
+          (testing:assert-equal (stride types:broken-down-time storage) 56)
+          (testing:assert-equal (stride types:poll-descriptor storage) 8)
+          (testing:assert-equal (stride types:socket-address storage) 16)
+          (testing:assert-equal (stride types:socket-address-storage storage) 128)
+          (testing:assert-equal (stride types:ipv4-socket-address storage) 16)
+          (testing:assert-equal (stride types:ipv6-socket-address storage) 28)
+          (testing:assert-equal (stride types:unix-socket-address storage) unix-address-size)
+          (testing:assert-equal (stride types:address-info storage) 48)
+          (testing:assert-equal (stride types:pthread-mutex storage) mutex-size)
+          (testing:assert-equal (stride types:pthread-condition storage) 48))))))
+
+(testing:test target-constants
+  (testing:assert-equal constants:STDIN-FILENO 0)
+  (testing:assert-equal constants:STDOUT-FILENO 1)
+  (testing:assert-equal constants:STDERR-FILENO 2)
+  (testing:assert-equal constants:EXIT-SUCCESS 0)
+  #+darwin (testing:assert-equal constants:O-CREAT 512)
+  #+linux (testing:assert-equal constants:O-CREAT 64)
+  #+darwin (testing:assert-equal constants:EAGAIN 35)
+  #+linux (testing:assert-equal constants:EAGAIN 11)
+  (let ((minimum types:c-char (base:minBound)))
+    (testing:assert-equal minimum #+linux #+aarch64 0 #+linux #+x86_64 -128 #+darwin -128)))
+
+(export abi-strides target-constants)

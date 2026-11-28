@@ -32,4 +32,24 @@
 
 (base:external-function exit "exit" (types:c-int) void)
 
-(export getenv setenv unsetenv getpid fork execv execve execvp wait waitpid exit)
+(base:external-function exit-immediately "_exit" (types:c-int) void)
+
+(base:external-function getppid "getppid" () types:pid-t)
+
+(base:external-function abort "abort" () void)
+
+(export
+  getenv
+  setenv
+  unsetenv
+  getpid
+  fork
+  execv
+  execve
+  execvp
+  wait
+  waitpid
+  exit
+  exit-immediately
+  getppid
+  abort)

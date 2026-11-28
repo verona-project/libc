@@ -23,4 +23,12 @@
 
 (base:external-function memcmp "memcmp" ((pointer void) (pointer void) types:size-t) types:c-int)
 
-(export malloc calloc realloc free memcpy memmove memset memcmp)
+(base:external-function memchr "memchr" ((pointer void) types:c-int types:size-t) (pointer void))
+
+(base:external-function
+  posix-memalign
+  "posix_memalign"
+  ((pointer (pointer void)) types:size-t types:size-t)
+  types:c-int)
+
+(export malloc calloc realloc free memcpy memmove memset memcmp memchr posix-memalign)

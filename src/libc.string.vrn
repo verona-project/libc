@@ -23,4 +23,34 @@
 
 (base:external-function strerror "strerror" (types:c-int) types:c-string)
 
-(export strlen strcmp strncmp strcpy strncpy strchr strstr strerror)
+(base:external-function strnlen "strnlen" (types:c-string types:size-t) types:size-t)
+
+(base:external-function strdup "strdup" (types:c-string) types:c-string)
+
+(base:external-function strndup "strndup" (types:c-string types:size-t) types:c-string)
+
+(base:external-function strrchr "strrchr" (types:c-string types:c-int) types:c-string)
+
+(base:external-function strcat "strcat" (types:c-string types:c-string) types:c-string)
+
+(base:external-function
+  strtok-r
+  "strtok_r"
+  (types:c-string types:c-string (pointer types:c-string))
+  types:c-string)
+
+(export
+  strlen
+  strcmp
+  strncmp
+  strcpy
+  strncpy
+  strchr
+  strstr
+  strerror
+  strnlen
+  strdup
+  strndup
+  strrchr
+  strcat
+  strtok-r)

@@ -1,0 +1,152 @@
+(import base)
+(import testing)
+(import libc.constants :as constants)
+(import libc.dynamic :as dynamic)
+(import libc.memory :as memory)
+(import libc.process :as process)
+(import libc.pthread :as thread)
+(import libc.random :as random)
+(import libc.types :as types)
+(import test.support :as support)
+
+(testing:test environment
+  (let ((name types:c-string "VERONA_LIBC_TEST_ENVIRONMENT"))
+    (testing:checks
+      (testing:assert-greater-than (process:getpid) 0)
+      (testing:assert-greater-than (process:getppid) 0)
+      (testing:assert-equal (process:setenv name "first" 1) 0)
+      (support:assert-string (process:getenv name) "first")
+      (testing:assert-equal (process:setenv name "ignored" 0) 0)
+      (support:assert-string (process:getenv name) "first")
+      (testing:assert-equal (process:unsetenv name) 0)
+      (testing:check (base:is-null (cast (pointer void) (process:getenv name)))))))
+
+(testing:test child-exit-status
+  (let ((child types:pid-t (process:fork)))
+    (base:cond
+      ((< child 0) (testing:fail))
+      ((== child 0) (do (process:exit-immediately 37) (testing:fail)))
+      (true
+        (let ((status types:c-int 0) (reaped types:pid-t (process:waitpid child (& status) 0)))
+          (testing:checks
+            (testing:assert-equal reaped child)
+            (testing:assert-equal status (* (cast i32 37) 256))))))))
+
+(testing:test exec-and-wait
+  (let
+    ((arguments (array types:c-string 4) (array-of "sh" "-c" "exit 23" nil))
+     (child types:pid-t (process:fork)))
+    (base:cond
+      ((< child 0) (testing:fail))
+      ((== child 0)
+       (do
+         (process:execv "/bin/sh" (& (index arguments 0)))
+         (process:exit-immediately 127)
+         (testing:fail)))
+      (true
+        (let ((status types:c-int 0) (reaped types:pid-t (process:wait (& status))))
+          (testing:checks
+            (testing:assert-equal reaped child)
+            (testing:assert-equal status (* (cast i32 23) 256))))))))
+
+(base:function return-argument ((argument (pointer void))) (pointer void)
+  argument)
+
+(base:function start-and-join ((attributes (pointer types:pthread-attributes))) testing:result
+  (let
+    ((id types:pthread-thread (thread:pthread-self)) (argument i32 41) (output (pointer void) nil))
+    (match
+      (thread:pthread-create (& id) attributes return-argument (cast (pointer void) (& argument)))
+      (0
+        (match (thread:pthread-join id (& output))
+          (0
+            (match (support:present output)
+              (true (testing:assert-equal (deref (cast (pointer i32) output)) 41))
+              (false (testing:fail))))
+          (_ (testing:fail))))
+      (_ (testing:fail)))))
+
+(testing:test thread-lifecycle
+  (testing:with-fixture (storage (pointer void) (memory:calloc 1 64) memory:free)
+    (match (support:present storage)
+      (false (testing:fail))
+      (true
+        (let
+          ((attributes
+             (pointer types:pthread-attributes)
+             (cast (pointer types:pthread-attributes) storage)))
+          (match (thread:pthread-attr-init attributes)
+            (0
+              (testing:checks
+                (start-and-join attributes)
+                (testing:assert-equal (thread:pthread-attr-destroy attributes) 0)))
+            (_ (testing:fail))))))))
+
+(base:function condition-lifecycle () testing:result
+  (let ((value types:pthread-condition (types:pthread-condition (array-of 0 0 0 0 0 0))))
+    (match (thread:pthread-cond-init (& value) nil)
+      (0
+        (testing:checks
+          (testing:assert-equal (thread:pthread-cond-signal (& value)) 0)
+          (testing:assert-equal (thread:pthread-cond-broadcast (& value)) 0)
+          (testing:assert-equal (thread:pthread-cond-destroy (& value)) 0)))
+      (_ (testing:fail)))))
+
+(testing:test synchronization
+  (testing:with-fixture (storage (pointer void) (memory:calloc 1 64) memory:free)
+    (match (support:present storage)
+      (false (testing:fail))
+      (true
+        (let ((mutex (pointer types:pthread-mutex) (cast (pointer types:pthread-mutex) storage)))
+          (match (thread:pthread-mutex-init mutex nil)
+            (0
+              (testing:checks
+                (match (thread:pthread-mutex-trylock mutex)
+                  (0
+                    (testing:checks
+                      (condition-lifecycle)
+                      (testing:assert-equal (thread:pthread-mutex-unlock mutex) 0)))
+                  (_ (testing:fail)))
+                (testing:assert-equal (thread:pthread-mutex-destroy mutex) 0)))
+            (_ (testing:fail))))))))
+
+(testing:test dynamic-symbols
+  (let ((handle (pointer void) (dynamic:dlopen nil 1)))
+    (match (support:present handle)
+      (false (testing:fail))
+      (true
+        (do
+          (dynamic:dlerror)
+          (let
+            ((known (pointer void) (dynamic:dlsym handle "malloc"))
+             (known-error types:c-string (dynamic:dlerror))
+             (missing (pointer void) (dynamic:dlsym handle "verona_libc_symbol_does_not_exist"))
+             (missing-error types:c-string (dynamic:dlerror)))
+            (testing:checks
+              (testing:check (support:present known))
+              (testing:check (base:is-null (cast (pointer void) known-error)))
+              (testing:check (base:is-null missing))
+              (testing:check (support:present (cast (pointer void) missing-error)))
+              (testing:assert-equal (dynamic:dlclose handle) 0))))))))
+
+(base:function random-samples ((remaining i32)) testing:result
+  (match remaining
+    (0 (testing:empty))
+    (_
+      (testing:checks
+        (testing:assert-less-than (random:arc4random-uniform 31) 31)
+        (random-samples (- remaining 1))))))
+
+(testing:test bounded-random
+  (testing:assert-equal (random:arc4random-uniform 0) 0)
+  (testing:assert-equal (random:arc4random-uniform 1) 0)
+  (random-samples 32))
+
+(export
+  environment
+  child-exit-status
+  exec-and-wait
+  thread-lifecycle
+  synchronization
+  dynamic-symbols
+  bounded-random)

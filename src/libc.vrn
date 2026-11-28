@@ -15,3 +15,5 @@
 (import libc.math)
 (import libc.network)
 (import libc.pthread)
+(import libc.dynamic)
+(import libc.random)

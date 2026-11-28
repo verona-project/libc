@@ -40,4 +40,56 @@
 
 (base:external-function perror "perror" (types:c-string) void)
 
-(export fopen tmpfile fileno ferror fclose fread fwrite fgets fputs getchar putchar puts perror)
+(base:external-function
+  fdopen
+  "fdopen"
+  (types:file-descriptor types:c-string)
+  (pointer types:file-stream))
+
+(base:external-function fflush "fflush" ((pointer types:file-stream)) types:c-int)
+
+(base:external-function feof "feof" ((pointer types:file-stream)) types:c-int)
+
+(base:external-function clearerr "clearerr" ((pointer types:file-stream)) void)
+
+(base:external-function fgetc "fgetc" ((pointer types:file-stream)) types:c-int)
+
+(base:external-function fputc "fputc" (types:c-int (pointer types:file-stream)) types:c-int)
+
+(base:external-function
+  getline
+  "getline"
+  ((pointer types:c-string) (pointer types:size-t) (pointer types:file-stream))
+  types:ssize-t)
+
+(base:external-function
+  fseeko
+  "fseeko"
+  ((pointer types:file-stream) types:off-t types:c-int)
+  types:c-int)
+
+(base:external-function ftello "ftello" ((pointer types:file-stream)) types:off-t)
+
+(export
+  fopen
+  tmpfile
+  fileno
+  ferror
+  fclose
+  fread
+  fwrite
+  fgets
+  fputs
+  getchar
+  putchar
+  puts
+  perror
+  fdopen
+  fflush
+  feof
+  clearerr
+  fgetc
+  fputc
+  getline
+  fseeko
+  ftello)

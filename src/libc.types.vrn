@@ -2,7 +2,11 @@
 
 ;; C scalar aliases preserve the platform C ABI.  Use these at foreign-call
 ;; boundaries; ordinary Verona code should normally use the built-in types.
-(base:type c-char i8)
+#+linux #+aarch64 (base:type c-char u8)
+
+#+linux #-aarch64 (base:type c-char i8)
+
+#-linux (base:type c-char i8)
 
 (base:type c-uchar u8)
 
@@ -36,9 +40,14 @@
 
 (base:type socket-length-t u32)
 
-;; File descriptors are integer handles.  The following opaque types are only
-;; meaningful behind pointers returned to, or accepted from, libc.
+#+darwin (base:type poll-count-t c-uint)
+
+#+linux (base:type poll-count-t size-t)
+
+;; File descriptors are integer handles.
 (base:type file-descriptor c-int)
+
+(base:type poll-descriptor (product (fd file-descriptor) (events c-short) (revents c-short)))
 
 (base:type c-string (pointer u8))
 
@@ -46,29 +55,213 @@
 
 (base:type directory-stream)
 
-(base:type file-status)
+#+darwin (base:type directory-entry
+           (product
+             (inode u64)
+             (seek-offset u64)
+             (record-length u16)
+             (name-length u16)
+             (kind u8)
+             (name (array u8 1024))))
 
-(base:type time-specification)
+#+linux (base:type directory-entry
+          (product (inode u64) (offset off-t) (record-length u16) (kind u8) (name (array u8 256))))
 
-(base:type socket-address)
+(base:type time-specification (product (seconds time-t) (nanoseconds c-long)))
 
-(base:type address-info)
+;; struct stat with 64-bit inodes on Darwin and the native glibc Linux layouts.
+#+darwin (base:type file-status
+           (product
+             (device i32)
+             (mode mode-t)
+             (link-count u16)
+             (inode u64)
+             (uid u32)
+             (gid u32)
+             (special-device i32)
+             (access-time time-specification)
+             (modification-time time-specification)
+             (status-change-time time-specification)
+             (birth-time time-specification)
+             (size off-t)
+             (block-count i64)
+             (block-size i32)
+             (flags u32)
+             (generation u32)
+             (reserved i32)
+             (reserved-words (array i64 2))))
+
+#+linux #+x86_64 (base:type file-status
+                   (product
+                     (device u64)
+                     (inode u64)
+                     (link-count u64)
+                     (mode mode-t)
+                     (uid u32)
+                     (gid u32)
+                     (padding i32)
+                     (special-device u64)
+                     (size off-t)
+                     (block-size i64)
+                     (block-count i64)
+                     (access-time time-specification)
+                     (modification-time time-specification)
+                     (status-change-time time-specification)
+                     (reserved-words (array i64 3))))
+
+#+linux #+aarch64 (base:type file-status
+                    (product
+                      (device u64)
+                      (inode u64)
+                      (mode mode-t)
+                      (link-count u32)
+                      (uid u32)
+                      (gid u32)
+                      (special-device u64)
+                      (padding u64)
+                      (size off-t)
+                      (block-size i32)
+                      (block-size-padding i32)
+                      (block-count i64)
+                      (access-time time-specification)
+                      (modification-time time-specification)
+                      (status-change-time time-specification)
+                      (reserved-words (array i32 2))))
+
+;; struct tm on the supported 64-bit Darwin and Linux ABIs.
+(base:type broken-down-time
+  (product
+    (second c-int)
+    (minute c-int)
+    (hour c-int)
+    (day-of-month c-int)
+    (month c-int)
+    (year c-int)
+    (day-of-week c-int)
+    (day-of-year c-int)
+    (daylight-saving c-int)
+    (utc-offset c-long)
+    (zone c-string)))
+
+#+darwin (base:type socket-family-t u8)
+
+#+linux (base:type socket-family-t u16)
+
+#+darwin (base:type socket-address
+           (product (length u8) (family socket-family-t) (data (array u8 14))))
+
+#+linux (base:type socket-address (product (family socket-family-t) (data (array u8 14))))
+
+;; The alignment word keeps arbitrary socket addresses correctly aligned.
+#+darwin (base:type socket-address-storage
+           (product
+             (length u8)
+             (family socket-family-t)
+             (padding (array u8 6))
+             (alignment i64)
+             (storage (array u8 112))))
+
+#+linux (base:type socket-address-storage
+          (product (family socket-family-t) (storage (array u8 118)) (alignment u64)))
+
+;; ai_canonname and ai_addr appear in opposite orders on Darwin and Linux.
+#+darwin (base:type address-info
+           (product
+             (flags c-int)
+             (family c-int)
+             (socket-kind c-int)
+             (protocol c-int)
+             (address-length socket-length-t)
+             (canonical-name c-string)
+             (address (pointer socket-address))
+             (next (pointer address-info))))
+
+#+linux (base:type address-info
+          (product
+            (flags c-int)
+            (family c-int)
+            (socket-kind c-int)
+            (protocol c-int)
+            (address-length socket-length-t)
+            (address (pointer socket-address))
+            (canonical-name c-string)
+            (next (pointer address-info))))
 
 #+darwin (base:type pthread-thread (pointer void))
 
 #+linux (base:type pthread-thread c-ulong)
 
-(base:type pthread-mutex)
+;; Storage for pthread objects. Initialize and destroy them through libc.
+#+darwin (base:type pthread-attributes (product (storage (array u64 8))))
 
-(base:type pthread-condition)
+#+darwin (base:type pthread-mutex (product (storage (array u64 8))))
+
+#+darwin (base:type pthread-condition (product (storage (array u64 6))))
+
+#+darwin (base:type pthread-mutex-attributes (product (storage (array u64 2))))
+
+#+darwin (base:type pthread-condition-attributes (product (storage (array u64 2))))
+
+;; glibc unions contain an integer member that determines their alignment.
+#+linux #+x86_64 (base:type pthread-attributes (product (storage (array u64 7))))
+
+#+linux #+aarch64 (base:type pthread-attributes (product (storage (array u64 8))))
+
+#+linux #+x86_64 (base:type pthread-mutex (product (storage (array u64 5))))
+
+#+linux #+aarch64 (base:type pthread-mutex (product (storage (array u64 6))))
+
+#+linux (base:type pthread-condition (product (storage (array u64 6))))
+
+#+linux #+x86_64 (base:type pthread-mutex-attributes (product (storage c-int)))
+
+#+linux #+aarch64 (base:type pthread-mutex-attributes (product (storage (array c-int 2))))
+
+#+linux #+x86_64 (base:type pthread-condition-attributes (product (storage c-int)))
+
+#+linux #+aarch64 (base:type pthread-condition-attributes (product (storage (array c-int 2))))
+
+(base:type pthread-start-routine (pointer (function ((pointer void)) (pointer void))))
+
+(base:type comparison-function (pointer (function ((pointer void) (pointer void)) c-int)))
 
 ;; sockaddr_in has a different family field layout on Darwin and Linux.
 ;; Initialise its fields in platform-specific application code.
 #+darwin (base:type ipv4-socket-address
-           (product (length u8) (family u8) (port u16) (address u32) (padding (array u8 8))))
+           (product
+             (length u8)
+             (family socket-family-t)
+             (port u16)
+             (address u32)
+             (padding (array u8 8))))
 
 #+linux (base:type ipv4-socket-address
-          (product (family u16) (port u16) (address u32) (padding (array u8 8))))
+          (product (family socket-family-t) (port u16) (address u32) (padding (array u8 8))))
+
+;; An IPv6 address occupies 16 bytes and has the alignment of its uint32_t view.
+(base:type ipv6-address (product (words (array u32 4))))
+
+#+darwin (base:type ipv6-socket-address
+           (product
+             (length u8)
+             (family socket-family-t)
+             (port u16)
+             (flow-info u32)
+             (address ipv6-address)
+             (scope-id u32)))
+
+#+linux (base:type ipv6-socket-address
+          (product
+            (family socket-family-t)
+            (port u16)
+            (flow-info u32)
+            (address ipv6-address)
+            (scope-id u32)))
+
+#+darwin (base:type unix-socket-address
+           (product (length u8) (family socket-family-t) (path (array u8 104))))
+
+#+linux (base:type unix-socket-address (product (family socket-family-t) (path (array u8 108))))
 
 (export
   c-char
@@ -87,15 +280,29 @@
   time-t
   clock-id-t
   socket-length-t
+  poll-count-t
   file-descriptor
+  poll-descriptor
   c-string
   file-stream
   directory-stream
+  directory-entry
   file-status
   time-specification
+  broken-down-time
+  socket-family-t
   socket-address
+  socket-address-storage
   address-info
   pthread-thread
+  pthread-attributes
   pthread-mutex
+  pthread-mutex-attributes
   pthread-condition
-  ipv4-socket-address)
+  pthread-condition-attributes
+  pthread-start-routine
+  comparison-function
+  ipv4-socket-address
+  ipv6-address
+  ipv6-socket-address
+  unix-socket-address)

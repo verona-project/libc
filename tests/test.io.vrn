@@ -1,0 +1,140 @@
+(import base)
+(import testing)
+(import libc.constants :as constants)
+(import libc.descriptor :as fd)
+(import libc.errno :as errno)
+(import libc.filesystem :as fs)
+(import libc.memory :as memory)
+(import libc.stdio :as io)
+(import libc.string :as string)
+(import libc.types :as types)
+(import test.support :as support)
+
+(testing:test error-state
+  (let
+    ((slot (pointer types:c-int) (errno:errno-pointer))
+     (closed types:c-int (fd:close -1))
+     (error types:c-int (deref slot)))
+    (testing:checks
+      (testing:assert-equal closed -1)
+      (testing:assert-equal error constants:EBADF)
+      (testing:check (support:present (cast (pointer void) (string:strerror error)))))))
+
+(testing:test pipe-readiness
+  (let ((ends (array types:file-descriptor 2) (array-of -1 -1)) (byte u8 0))
+    (match (fd:pipe (& (index ends 0)))
+      (0
+        (let
+          ((reader types:file-descriptor (index ends 0))
+           (writer types:file-descriptor (index ends 1))
+           (watch types:poll-descriptor (types:poll-descriptor reader 1 0))
+           (before types:c-int (fd:poll (& watch) 1 0))
+           (sent types:ssize-t (fd:write writer (cast (pointer void) "Z") 1))
+           (ready types:c-int (fd:poll (& watch) 1 0))
+           (received
+             types:ssize-t
+             (match ready (1 (fd:read reader (cast (pointer void) (& byte)) 1)) (_ -1))))
+          (testing:checks
+            (testing:assert-equal before 0)
+            (testing:assert-equal sent 1)
+            (testing:assert-equal ready 1)
+            (testing:assert-equal (field watch revents) 1)
+            (testing:assert-equal received 1)
+            (testing:assert-equal byte 90)
+            (testing:assert-equal (fd:close reader) 0)
+            (testing:assert-equal (fd:close writer) 0))))
+      (_ (testing:fail)))))
+
+(base:function stream-checks ((file (pointer types:file-stream))) testing:result
+  (let
+    ((buffer types:c-string nil)
+     (capacity types:size-t 0)
+     (wrote types:c-int (io:fputs "one\n" file))
+     (flushed types:c-int (io:fflush file))
+     (position types:off-t (io:ftello file))
+     (seek types:c-int (io:fseeko file 0 constants:SEEK-SET))
+     (length types:ssize-t (io:getline (& buffer) (& capacity) file))
+     (end types:c-int (io:fgetc file))
+     (eof types:c-int (io:feof file))
+     (error types:c-int (io:ferror file))
+     (result
+       testing:result
+       (testing:checks
+         (testing:assert-greater-or-equal wrote 0)
+         (testing:assert-equal flushed 0)
+         (testing:assert-equal position 4)
+         (testing:assert-equal seek 0)
+         (testing:assert-equal length 4)
+         (support:assert-string buffer "one\n")
+         (testing:assert-equal end constants:EOF)
+         (testing:assert-not-equal eof 0)
+         (testing:assert-equal error 0))))
+    (do
+      (memory:free (cast (pointer void) buffer))
+      (io:clearerr file)
+      (testing:checks result (testing:assert-equal (io:feof file) 0)))))
+
+(testing:test buffered-stream
+  (let ((file (pointer types:file-stream) (io:tmpfile)))
+    (match (support:present (cast (pointer void) file))
+      (true (testing:checks (stream-checks file) (testing:assert-equal (io:fclose file) 0)))
+      (false (testing:fail)))))
+
+(base:function status-check ((file types:file-descriptor) (path types:c-string)) testing:result
+  ;; All supported struct stat layouts fit in 18 aligned 64-bit words.
+  (let
+    ((storage (array u64 18) (array-of 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0))
+     (status
+       (pointer types:file-status)
+       (cast (pointer types:file-status) (cast (pointer void) (& (index storage 0)))))
+     (wrote types:ssize-t (fd:pwrite file (cast (pointer void) "xyz") 3 0))
+     (by-fd types:c-int (fs:fstat file status))
+     (size types:off-t (field (deref status) size))
+     (by-path types:c-int (fs:stat path status))
+     (path-size types:off-t (field (deref status) size))
+     (by-link types:c-int (fs:lstat path status))
+     (first u8 0)
+     (read-at types:ssize-t (fd:pread file (cast (pointer void) (& first)) 1 1)))
+    (testing:checks
+      (testing:assert-equal wrote 3)
+      (testing:assert-equal by-fd 0)
+      (testing:assert-equal by-path 0)
+      (testing:assert-equal by-link 0)
+      (testing:assert-equal size 3)
+      (testing:assert-equal path-size 3)
+      (testing:assert-equal read-at 1)
+      (testing:assert-equal first 121))))
+
+(testing:test temporary-file
+  (let
+    ((buffer
+       (array u8 32)
+       (array-of 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0))
+     (path types:c-string (string:strcpy (& (index buffer 0)) "/tmp/verona-libc.XXXXXX"))
+     (file types:file-descriptor (fs:mkstemp path)))
+    (match (< file 0)
+      (true (testing:fail))
+      (false
+        (testing:checks
+          (status-check file path)
+          (testing:assert-equal (fd:lseek file 0 constants:SEEK-CUR) 0)
+          (testing:assert-equal (fd:ftruncate file 1) 0)
+          (testing:assert-equal (fd:close file) 0)
+          (testing:assert-equal (fs:unlink path) 0))))))
+
+(testing:test directory-entry
+  (let ((directory (pointer types:directory-stream) (fs:opendir ".")))
+    (match (support:present (cast (pointer void) directory))
+      (true
+        (let ((entry (pointer types:directory-entry) (fs:readdir directory)))
+          (testing:checks
+            (match (support:present (cast (pointer void) entry))
+              (true
+                (testing:assert-greater-than
+                  (string:strlen (& (index (field (deref entry) name) 0)))
+                  0))
+              (false (testing:fail)))
+            (testing:assert-equal (fs:closedir directory) 0))))
+      (false (testing:fail)))))
+
+(export error-state pipe-readiness buffered-stream temporary-file directory-entry)

@@ -1,0 +1,96 @@
+(import base)
+(import testing)
+(import libc.constants :as constants)
+(import libc.memory :as memory)
+(import libc.string :as string)
+(import libc.types :as types)
+(import test.support :as support)
+
+(testing:test allocation-and-copy
+  (let ((bytes (pointer void) (memory:calloc 1 8)))
+    (match (support:present bytes)
+      (false (testing:fail))
+      (true
+        (let ((zero u8 (deref (cast (pointer u8) bytes))))
+          (do
+            (memory:memcpy bytes (cast (pointer void) "abc") 4)
+            (let ((larger (pointer void) (memory:realloc bytes 16)))
+              (match (support:present larger)
+                (false (do (memory:free bytes) (testing:fail)))
+                (true
+                  (let
+                    ((result
+                       testing:result
+                       (testing:checks
+                         (testing:assert-equal zero 0)
+                         (support:assert-string (cast types:c-string larger) "abc")
+                         (testing:assert-equal
+                           (memory:memcmp larger (cast (pointer void) "abc") 4)
+                           0)
+                         (testing:check (support:present (memory:memchr larger 98 3))))))
+                    (do (memory:free larger) result)))))))))))
+
+(testing:test overlapping-move
+  (let ((bytes (array u8 6) (array-of 97 98 99 100 0 0)) (start types:c-string (& (index bytes 0))))
+    (do
+      (memory:memmove (cast (pointer void) (pointer-offset start 1)) (cast (pointer void) start) 5)
+      (let ((result testing:result (support:assert-string start "aabcd")))
+        (do
+          (memory:memset (cast (pointer void) start) 120 2)
+          (testing:checks result (support:assert-string start "xxbcd")))))))
+
+(testing:test aligned-allocation
+  (let
+    ((bytes (pointer void) nil)
+     (invalid (pointer void) nil)
+     (error i32 (memory:posix-memalign (& invalid) 3 16)))
+    (match (memory:posix-memalign (& bytes) 64 64)
+      (0
+        (let
+          ((address u64 (%pointer-difference-primitive-pointer bytes (cast (pointer void) nil)))
+           (result
+             testing:result
+             (testing:checks
+               (testing:check (support:present bytes))
+               (testing:assert-equal (- address (* (/ address 64) 64)) 0)
+               (testing:assert-equal error constants:EINVAL))))
+          (do (memory:free bytes) result)))
+      (_ (testing:fail)))))
+
+(testing:test string-search
+  (testing:assert-equal (string:strlen "banana") 6)
+  (testing:assert-equal (string:strnlen "banana" 3) 3)
+  (testing:assert-equal (string:strncmp "ban" "banana" 3) 0)
+  (support:assert-string (string:strchr "banana" 110) "nana")
+  (support:assert-string (string:strrchr "banana" 110) "na")
+  (support:assert-string (string:strstr "banana" "ana") "anana")
+  (testing:check (base:is-null (cast (pointer void) (string:strstr "banana" "pear")))))
+
+(testing:test string-copy-and-tokenize
+  (let
+    ((bytes (array u8 8) (array-of 0 0 0 0 0 0 0 0))
+     (text types:c-string (& (index bytes 0)))
+     (saved types:c-string nil)
+     (copy types:c-string (string:strndup "alpha" 3)))
+    (do
+      (string:strcpy text "a,")
+      (string:strcat text "b")
+      (let
+        ((first types:c-string (string:strtok-r text "," (& saved)))
+         (second types:c-string (string:strtok-r nil "," (& saved)))
+         (end types:c-string (string:strtok-r nil "," (& saved)))
+         (result
+           testing:result
+           (testing:checks
+             (support:assert-string copy "alp")
+             (support:assert-string first "a")
+             (support:assert-string second "b")
+             (testing:check (base:is-null (cast (pointer void) end))))))
+        (do (memory:free (cast (pointer void) copy)) result)))))
+
+(export
+  allocation-and-copy
+  overlapping-move
+  aligned-allocation
+  string-search
+  string-copy-and-tokenize)

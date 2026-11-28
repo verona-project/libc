@@ -1,7 +1,7 @@
 (import base)
 (import libc.types :as types)
 
-;; Time and sleep functions.  Time structures are opaque ABI values for now.
+;; Time, calendar conversion, and sleep functions.
 (base:external-function time "time" ((pointer types:time-t)) types:time-t)
 
 (base:external-function
@@ -18,4 +18,30 @@
   ((pointer types:time-specification) (pointer types:time-specification))
   types:c-int)
 
-(export time clock-gettime sleep nanosleep)
+(base:external-function
+  clock-getres
+  "clock_getres"
+  (types:clock-id-t (pointer types:time-specification))
+  types:c-int)
+
+(base:external-function
+  gmtime-r
+  "gmtime_r"
+  ((pointer types:time-t) (pointer types:broken-down-time))
+  (pointer types:broken-down-time))
+
+(base:external-function
+  localtime-r
+  "localtime_r"
+  ((pointer types:time-t) (pointer types:broken-down-time))
+  (pointer types:broken-down-time))
+
+(base:external-function mktime "mktime" ((pointer types:broken-down-time)) types:time-t)
+
+(base:external-function
+  strftime
+  "strftime"
+  (types:c-string types:size-t types:c-string (pointer types:broken-down-time))
+  types:size-t)
+
+(export time clock-gettime sleep nanosleep clock-getres gmtime-r localtime-r mktime strftime)

@@ -30,4 +30,28 @@
   (types:file-descriptor types:file-descriptor)
   types:file-descriptor)
 
-(export open close read write lseek pipe dup dup2)
+(base:external-function
+  pread
+  "pread"
+  (types:file-descriptor (pointer void) types:size-t types:off-t)
+  types:ssize-t)
+
+(base:external-function
+  pwrite
+  "pwrite"
+  (types:file-descriptor (pointer void) types:size-t types:off-t)
+  types:ssize-t)
+
+(base:external-function fsync "fsync" (types:file-descriptor) types:c-int)
+
+(base:external-function ftruncate "ftruncate" (types:file-descriptor types:off-t) types:c-int)
+
+(base:external-function isatty "isatty" (types:file-descriptor) types:c-int)
+
+(base:external-function
+  poll
+  "poll"
+  ((pointer types:poll-descriptor) types:poll-count-t types:c-int)
+  types:c-int)
+
+(export open close read write lseek pipe dup dup2 pread pwrite fsync ftruncate isatty poll)

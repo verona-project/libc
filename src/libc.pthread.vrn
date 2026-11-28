@@ -1,12 +1,15 @@
 (import base)
 (import libc.types :as types)
 
-;; POSIX thread and synchronization declarations.  They need C-compatible
-;; start routines and opaque storage, so they are intentionally low-level.
+;; POSIX threads and synchronization. The attributes argument can be nil
+;; to select the C library's defaults.
 (base:external-function
   pthread-create
   "pthread_create"
-  ((pointer types:pthread-thread) (pointer void) (pointer void) (pointer void))
+  ((pointer types:pthread-thread)
+   (pointer types:pthread-attributes)
+   types:pthread-start-routine
+   (pointer void))
   types:c-int)
 
 (base:external-function
@@ -18,7 +21,7 @@
 (base:external-function
   pthread-mutex-init
   "pthread_mutex_init"
-  ((pointer types:pthread-mutex) (pointer void))
+  ((pointer types:pthread-mutex) (pointer types:pthread-mutex-attributes))
   types:c-int)
 
 (base:external-function
@@ -42,7 +45,7 @@
 (base:external-function
   pthread-cond-init
   "pthread_cond_init"
-  ((pointer types:pthread-condition) (pointer void))
+  ((pointer types:pthread-condition) (pointer types:pthread-condition-attributes))
   types:c-int)
 
 (base:external-function
@@ -69,6 +72,66 @@
   ((pointer types:pthread-condition))
   types:c-int)
 
+(base:external-function pthread-self "pthread_self" () types:pthread-thread)
+
+(base:external-function
+  pthread-equal
+  "pthread_equal"
+  (types:pthread-thread types:pthread-thread)
+  types:c-int)
+
+(base:external-function pthread-detach "pthread_detach" (types:pthread-thread) types:c-int)
+
+(base:external-function
+  pthread-mutex-trylock
+  "pthread_mutex_trylock"
+  ((pointer types:pthread-mutex))
+  types:c-int)
+
+(base:external-function
+  pthread-cond-timedwait
+  "pthread_cond_timedwait"
+  ((pointer types:pthread-condition)
+   (pointer types:pthread-mutex)
+   (pointer types:time-specification))
+  types:c-int)
+
+(base:external-function
+  pthread-attr-init
+  "pthread_attr_init"
+  ((pointer types:pthread-attributes))
+  types:c-int)
+
+(base:external-function
+  pthread-attr-destroy
+  "pthread_attr_destroy"
+  ((pointer types:pthread-attributes))
+  types:c-int)
+
+(base:external-function
+  pthread-mutexattr-init
+  "pthread_mutexattr_init"
+  ((pointer types:pthread-mutex-attributes))
+  types:c-int)
+
+(base:external-function
+  pthread-mutexattr-destroy
+  "pthread_mutexattr_destroy"
+  ((pointer types:pthread-mutex-attributes))
+  types:c-int)
+
+(base:external-function
+  pthread-condattr-init
+  "pthread_condattr_init"
+  ((pointer types:pthread-condition-attributes))
+  types:c-int)
+
+(base:external-function
+  pthread-condattr-destroy
+  "pthread_condattr_destroy"
+  ((pointer types:pthread-condition-attributes))
+  types:c-int)
+
 (export
   pthread-create
   pthread-join
@@ -80,4 +143,15 @@
   pthread-cond-destroy
   pthread-cond-wait
   pthread-cond-signal
-  pthread-cond-broadcast)
+  pthread-cond-broadcast
+  pthread-self
+  pthread-equal
+  pthread-detach
+  pthread-mutex-trylock
+  pthread-cond-timedwait
+  pthread-attr-init
+  pthread-attr-destroy
+  pthread-mutexattr-init
+  pthread-mutexattr-destroy
+  pthread-condattr-init
+  pthread-condattr-destroy)
